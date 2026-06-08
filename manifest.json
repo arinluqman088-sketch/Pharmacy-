@@ -1,0 +1,9 @@
+{
+  "name": "AR Pharmacy POS",
+  "short_name": "Pharmacy POS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ecfeff",
+  "theme_color": "#0f766e",
+  "orientation": "portrait"
+}
