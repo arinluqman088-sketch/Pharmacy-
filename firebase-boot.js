@@ -40,9 +40,9 @@ async function cloudLogin(email, password) {
   const accessRef = doc(db, ACCESS_COLLECTION, uid);
   const accessSnap = await getDoc(accessRef);
 
-  if (!accessSnap.exists()) {
-    throw new Error("ئەم user ـە ڕێگەی دەرمانخانەی نییە");
-  }
+if (!accessSnap.exists()) {
+  throw new Error("No pharmacy_access document for UID: " + uid);
+}
 
   const access = accessSnap.data();
   const pharmacyId = access.pharmacyId;
