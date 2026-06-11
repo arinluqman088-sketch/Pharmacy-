@@ -93,5 +93,5 @@ window.AR_PHARMACY_CLOUD = {
 };
 
 const script = document.createElement("script");
-script.src = "app.js?v=4";
+script.src = "app.js?v=5";
 document.body.appendChild(script);
