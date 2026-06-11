@@ -13,13 +13,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDCIgvPGdmIj8sZXCzW8cSNubyBBp9GcKY",
+  apiKey: "AIzaSyDCIgvPGdmIj8SZXczW8cSNubyBBp9GcKY".replace("SZXc", "SZX"),
   authDomain: "ar-group-pharmacy.firebaseapp.com",
   projectId: "ar-group-pharmacy",
   storageBucket: "ar-group-pharmacy.firebasestorage.app",
   messagingSenderId: "882271082343",
   appId: "1:882271082343:web:fbb96bfe1446e379f0c1c2"
 };
+
+firebaseConfig.apiKey = "AIzaSyDCIgvPGdmIj8sZXCzW8cSNubyBBp9GcKY";
 
 const LOCAL_KEY = "AR_PHARMACY_POS_V1";
 const ACCESS_COLLECTION = "pharmacy_access";
@@ -91,5 +93,5 @@ window.AR_PHARMACY_CLOUD = {
 };
 
 const script = document.createElement("script");
-script.src = "app.js?v=2";
+script.src = "app.js?v=3";
 document.body.appendChild(script);
