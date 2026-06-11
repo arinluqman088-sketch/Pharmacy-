@@ -1,28 +1,696 @@
+const LS = "AR_PHARMACY_POS_V1";
 
-const LS="AR_PHARMACY_POS_V1";
-const DEFAULT={settings:{pharmacyName:"AR Pharmacy POS",phone:"0773 214 1551",address:"Sulaymaniyah",username:"admin",password:"1234",receiptNote:"Thank you for choosing us"},users:[{id:"U1",username:"admin",password:"1234",role:"admin",name:"Admin"},{id:"U2",username:"cashier",password:"2222",role:"cashier",name:"Cashier"},{id:"U3",username:"pharmacist",password:"1111",role:"pharmacist",name:"Pharmacist"}],suppliers:[{id:"S1",name:"Main Supplier",phone:"0770 000 0000",address:"Sulaymaniyah",note:""}],customers:[{id:"C1",name:"Walk-in Customer",phone:"",address:""}],medicines:[{id:"M1",code:"M001",barcode:"1000001",name:"Paracetamol 500mg",scientificName:"Paracetamol",category:"Painkiller",company:"Generic",unit:"box",sellPrice:2000,buyPrice:1200,minStock:10,requiresPrescription:false},{id:"M2",code:"M002",barcode:"1000002",name:"Amoxicillin 500mg",scientificName:"Amoxicillin",category:"Antibiotic",company:"Generic",unit:"box",sellPrice:5000,buyPrice:3200,minStock:8,requiresPrescription:true},{id:"M3",code:"M003",barcode:"1000003",name:"Vitamin C",scientificName:"Ascorbic Acid",category:"Vitamin",company:"Generic",unit:"box",sellPrice:3000,buyPrice:1800,minStock:10,requiresPrescription:false}],batches:[{id:"B1",medicineId:"M1",batchNo:"P-2026-A",expiryDate:"2027-12-31",quantity:100,buyPrice:1200,sellPrice:2000},{id:"B2",medicineId:"M2",batchNo:"A-2026-B",expiryDate:"2026-12-31",quantity:50,buyPrice:3200,sellPrice:5000},{id:"B3",medicineId:"M3",batchNo:"V-2026-C",expiryDate:"2028-01-15",quantity:75,buyPrice:1800,sellPrice:3000}],purchases:[],purchaseItems:[],sales:[],saleItems:[],prescriptions:[],expenses:[]};
-let db=load();let state={logged:false,role:"",username:"",page:"dashboard",cart:[],editingMedicine:null,selectedCategory:""};
-function load(){const r=localStorage.getItem(LS);if(!r){localStorage.setItem(LS,JSON.stringify(DEFAULT));return structuredClone(DEFAULT)}try{return JSON.parse(r)}catch{return structuredClone(DEFAULT)}}
-function save(){
-  localStorage.setItem(LS,JSON.stringify(db));
-  if(window.AR_PHARMACY_CLOUD){
+const DEFAULT = {
+  settings: {
+    pharmacyName: "AR Pharmacy POS",
+    phone: "0773 214 1551",
+    address: "Sulaymaniyah",
+    receiptNote: "Thank you for choosing us"
+  },
+  suppliers: [{ id: "S1", name: "Main Supplier", phone: "0770 000 0000", address: "Sulaymaniyah", note: "" }],
+  customers: [{ id: "C1", name: "Walk-in Customer", phone: "", address: "" }],
+  medicines: [
+    { id: "M1", code: "M001", barcode: "1000001", name: "Paracetamol 500mg", scientificName: "Paracetamol", category: "Painkiller", company: "Generic", unit: "box", sellPrice: 2000, buyPrice: 1200, minStock: 10, requiresPrescription: false },
+    { id: "M2", code: "M002", barcode: "1000002", name: "Amoxicillin 500mg", scientificName: "Amoxicillin", category: "Antibiotic", company: "Generic", unit: "box", sellPrice: 5000, buyPrice: 3200, minStock: 8, requiresPrescription: true },
+    { id: "M3", code: "M003", barcode: "1000003", name: "Vitamin C", scientificName: "Ascorbic Acid", category: "Vitamin", company: "Generic", unit: "box", sellPrice: 3000, buyPrice: 1800, minStock: 10, requiresPrescription: false }
+  ],
+  batches: [
+    { id: "B1", medicineId: "M1", batchNo: "P-2026-A", expiryDate: "2027-12-31", quantity: 100, buyPrice: 1200, sellPrice: 2000 },
+    { id: "B2", medicineId: "M2", batchNo: "A-2026-B", expiryDate: "2026-12-31", quantity: 50, buyPrice: 3200, sellPrice: 5000 },
+    { id: "B3", medicineId: "M3", batchNo: "V-2026-C", expiryDate: "2028-01-15", quantity: 75, buyPrice: 1800, sellPrice: 3000 }
+  ],
+  sales: [],
+  saleItems: [],
+  purchases: [],
+  purchaseItems: [],
+  prescriptions: [],
+  expenses: []
+};
+
+let db = load();
+let state = { logged: false, role: "", username: "", page: "dashboard", cart: [], editingMedicine: null, selectedCategory: "" };
+
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+function load() {
+  const r = localStorage.getItem(LS);
+  if (!r) {
+    localStorage.setItem(LS, JSON.stringify(DEFAULT));
+    return clone(DEFAULT);
+  }
+
+  try {
+    const parsed = JSON.parse(r);
+    return {
+      ...clone(DEFAULT),
+      ...parsed,
+      settings: { ...clone(DEFAULT).settings, ...(parsed.settings || {}) },
+      suppliers: parsed.suppliers || [],
+      customers: parsed.customers || [],
+      medicines: parsed.medicines || [],
+      batches: parsed.batches || [],
+      sales: parsed.sales || [],
+      saleItems: parsed.saleItems || [],
+      purchases: parsed.purchases || [],
+      purchaseItems: parsed.purchaseItems || [],
+      prescriptions: parsed.prescriptions || [],
+      expenses: parsed.expenses || []
+    };
+  } catch {
+    return clone(DEFAULT);
+  }
+}
+
+function save() {
+  localStorage.setItem(LS, JSON.stringify(db));
+  if (window.AR_PHARMACY_CLOUD) {
     window.AR_PHARMACY_CLOUD.save(db).catch(console.log);
   }
-}function byId(id){return document.getElementById(id)}function uid(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}function money(n){return Number(n||0).toLocaleString()+" IQD"}function today(){return new Date().toISOString().slice(0,10)}function month(){return new Date().toISOString().slice(0,7)}function dateStr(d){return new Date(d).toLocaleString()}function med(id){return db.medicines.find(x=>x.id===id)}function batch(id){return db.batches.find(x=>x.id===id)}function customer(id){return db.customers.find(x=>x.id===id)}function supplier(id){return db.suppliers.find(x=>x.id===id)}function totalStock(mid){return db.batches.filter(b=>b.medicineId===mid).reduce((s,b)=>s+Number(b.quantity||0),0)}function validBatches(mid){return db.batches.filter(b=>b.medicineId===mid&&Number(b.quantity)>0).sort((a,b)=>String(a.expiryDate).localeCompare(String(b.expiryDate)))}function daysToExpiry(date){return Math.ceil((new Date(date+"T00:00:00")-new Date())/(1000*60*60*24))}function canManage(){return state.role==="admin"||state.role==="pharmacist"}function canSell(){return state.role==="admin"||state.role==="cashier"||state.role==="pharmacist"}
-function render(){const app=byId("app");if(!state.logged){app.innerHTML=`<div class="login card"><div class="logo">PH</div><h2>چوونەژوورەوە</h2><p class="muted">AR Pharmacy POS</p><div class="notice">سیستەمی بەڕێوەبردنی دەرمانخانە، کاشێر، ستۆک، بەرواری بەسەرچوون و ڕاپۆرت</div><label>ناوی بەکارهێنەر</label><input id="loginUser" value="admin"><label>پاسۆرد</label><input id="loginPass" type="password"><button onclick="login()" style="margin-top:12px">چوونەژوورەوە</button><p class="small muted">پاسۆرد لە ڕووکاردا پیشان نادرێت.</p></div>`;return}app.innerHTML=`<div class="app"><div class="topbar"><div class="brand"><span class="brandmark">PH</span>${db.settings.pharmacyName}<span class="badge blue">${state.role}</span></div><div class="actions"><span class="badge">${new Date().toLocaleDateString()}</span><button class="secondary" onclick="logout()">چوونەدەرەوە</button></div></div><div class="layout"><div class="sidebar">${nav("dashboard","داشبۆرد")}${nav("pos","فرۆشتن / POS")}${nav("medicines","دەرمانەکان")}${nav("batches","کۆگا و بەسەرچوون")}${nav("purchases","کڕین")}${nav("suppliers","دابینکەران")}${nav("customers","کڕیاران")}${nav("prescriptions","ڕەچەتەکان")}${nav("expenses","مەسروفات")}${nav("reports","ڕاپۆرت")}${nav("settings","ڕێکخستن")}</div><div class="content">${pageHtml()}</div></div></div><div id="printArea" class="hidden"></div>`;afterRender()}
-function nav(p,t){return `<button class="navbtn ${state.page===p?'active':''}" onclick="go('${p}')">${t}</button>`}function go(p){state.page=p;render()}function login(){const u=byId("loginUser").value.trim(),p=byId("loginPass").value;const user=db.users.find(x=>x.username===u&&x.password===p);if(!user){alert("ناوی بەکارهێنەر یان پاسۆرد هەڵەیە");return}state.logged=true;state.role=user.role;state.username=user.username;state.page="dashboard";render()}function logout(){state.logged=false;state.role="";state.cart=[];render()}function pageHtml(){if(state.page==="dashboard")return dashboardHtml();if(state.page==="pos")return posHtml();if(state.page==="medicines")return medicinesHtml();if(state.page==="batches")return batchesHtml();if(state.page==="purchases")return purchasesHtml();if(state.page==="suppliers")return suppliersHtml();if(state.page==="customers")return customersHtml();if(state.page==="prescriptions")return prescriptionsHtml();if(state.page==="expenses")return expensesHtml();if(state.page==="reports")return reportsHtml();return settingsHtml()}function afterRender(){if(state.page==="pos")renderMedGrid();if(state.page==="medicines")renderMedicineTable();if(state.page==="batches")renderBatchTable();if(state.page==="suppliers")renderSupplierTable();if(state.page==="customers")renderCustomerTable();if(state.page==="expenses")renderExpenseTable()}
-function dashboardHtml(){const salesToday=db.sales.filter(s=>String(s.date).slice(0,10)===today()),salesMonth=db.sales.filter(s=>String(s.date).slice(0,7)===month());const todayTotal=salesToday.reduce((s,x)=>s+x.total,0),monthTotal=salesMonth.reduce((s,x)=>s+x.total,0),profitToday=salesToday.reduce((s,x)=>s+x.profit,0);const low=db.medicines.filter(m=>totalStock(m.id)<=m.minStock).length,exp=db.batches.filter(b=>b.quantity>0&&daysToExpiry(b.expiryDate)<=60).length;return `<div class="grid four"><div class="card"><div class="muted">فرۆشتنی ئەمڕۆ</div><div class="kpi">${money(todayTotal)}</div></div><div class="card"><div class="muted">قازانجی ئەمڕۆ</div><div class="kpi">${money(profitToday)}</div></div><div class="card"><div class="muted">فرۆشتنی مانگ</div><div class="kpi">${money(monthTotal)}</div></div><div class="card"><div class="muted">ئاگاداری</div><div class="kpi">${low+exp}</div></div></div><div class="grid two" style="margin-top:14px"><div class="card"><h2>ستۆکی کەم</h2>${lowStockTable()}</div><div class="card"><h2>بەسەرچوون نزیک</h2>${expiryTable()}</div></div><div class="card" style="margin-top:14px"><h2>دوایین فرۆشتنەکان</h2>${salesTable(12)}</div>`}
-function lowStockTable(){const rows=db.medicines.filter(m=>totalStock(m.id)<=m.minStock).map(m=>`<tr><td>${m.code}</td><td>${m.name}</td><td>${totalStock(m.id)}</td><td>${m.minStock}</td></tr>`).join("");return `<div class="tablewrap"><table><thead><tr><th>کۆد</th><th>دەرمان</th><th>ستۆک</th><th>ئاگاداری</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="muted">هیچ دەرمانێک کەم نییە</td></tr>'}</tbody></table></div>`}function expiryTable(){const rows=db.batches.filter(b=>b.quantity>0&&daysToExpiry(b.expiryDate)<=60).sort((a,b)=>daysToExpiry(a.expiryDate)-daysToExpiry(b.expiryDate)).map(b=>{const m=med(b.medicineId)||{},days=daysToExpiry(b.expiryDate);return `<tr class="${days<0?'expired':'expiry-warn'}"><td>${m.name||''}</td><td>${b.batchNo}</td><td>${b.expiryDate}</td><td>${days}</td><td>${b.quantity}</td></tr>`}).join("");return `<div class="tablewrap"><table><thead><tr><th>دەرمان</th><th>Batch</th><th>بەسەرچوون</th><th>ڕۆژ</th><th>دانە</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="muted">هیچ بەسەرچوونێکی نزیک نییە</td></tr>'}</tbody></table></div>`}
-function posHtml(){if(!canSell())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;const subtotal=state.cart.reduce((s,i)=>s+i.qty*i.sellPrice,0),discount=Number(byId("discount")?.value||0),total=Math.max(0,subtotal-discount);return `<div class="grid two"><div class="card"><h2>فرۆشتن / POS</h2><div class="row"><input id="posSearch" placeholder="گەڕان بە ناو، کۆد یان بارکۆد..." oninput="renderMedGrid()"><button class="secondary" onclick="byId('posSearch').value='';renderMedGrid()">پاک</button></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="state.selectedCategory='';renderMedGrid()">هەموو</button>${[...new Set(db.medicines.map(x=>x.category||'Other'))].map(c=>`<button class="secondary" onclick="state.selectedCategory='${c}';renderMedGrid()">${c}</button>`).join("")}</div><div id="medGrid" class="medicine-grid"></div></div><div class="card"><h2>سەبەتە</h2><label>کڕیار</label><select id="saleCustomer">${db.customers.map(c=>`<option value="${c.id}">${c.name}${c.phone?' - '+c.phone:''}</option>`).join("")}</select><div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>دەرمان</th><th>Batch</th><th>دانە</th><th>کۆ</th><th></th></tr></thead><tbody>${state.cart.map((i,idx)=>`<tr><td>${i.name}</td><td>${i.batchNo}</td><td><input type="number" min="1" max="${i.available}" value="${i.qty}" style="width:75px" onchange="setCartQty(${idx},this.value)"></td><td>${money(i.qty*i.sellPrice)}</td><td><button class="red" onclick="removeCart(${idx})">X</button></td></tr>`).join("")||'<tr><td colspan="5" class="muted">سەبەتە بەتاڵە</td></tr>'}</tbody></table></div><div class="row"><div><label>داشکاندن</label><input id="discount" type="number" value="0" oninput="render()"></div><div><label>پارەی وەرگیراو</label><input id="paid" type="number" value="${total}"></div></div><div class="kpi">${money(total)}</div><div class="actions" style="margin-top:12px"><button class="green" onclick="checkout()">فرۆشتن و چاپ</button><button class="secondary" onclick="clearCart()">پاککردنەوە</button></div></div></div>`}
-function renderMedGrid(){const box=byId("medGrid");if(!box)return;const q=(byId("posSearch")?.value||"").toLowerCase();const items=db.medicines.filter(m=>(!state.selectedCategory||m.category===state.selectedCategory)&&(m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q)||String(m.barcode||"").includes(q)));box.innerHTML=items.map(m=>`<button class="medbtn" onclick="addToCart('${m.id}')"><b>${m.name}</b><span>${m.code} / ${m.category}</span><span>Stock: ${totalStock(m.id)}</span><strong>${money(m.sellPrice)}</strong>${m.requiresPrescription?'<span class="badge amber">ڕەچەتە پێویستە</span>':''}</button>`).join("")}function addToCart(mid){const m=med(mid);if(!m)return;const batches=validBatches(mid);if(!batches.length)return alert("ئەم دەرمانە ستۆکی نییە");const b=batches[0],ex=state.cart.find(x=>x.batchId===b.id);if(ex){if(ex.qty+1>b.quantity)return alert("ستۆک بەس نییە");ex.qty++}else state.cart.push({medicineId:m.id,batchId:b.id,batchNo:b.batchNo,name:m.name,qty:1,available:b.quantity,sellPrice:Number(b.sellPrice||m.sellPrice),buyPrice:Number(b.buyPrice||m.buyPrice)});render()}function setCartQty(idx,v){const i=state.cart[idx];i.qty=Math.max(1,Math.min(Number(i.available),Number(v||1)));render()}function removeCart(idx){state.cart.splice(idx,1);render()}function clearCart(){state.cart=[];render()}function checkout(){if(!state.cart.length)return alert("سەبەتە بەتاڵە");const subtotal=state.cart.reduce((s,i)=>s+i.qty*i.sellPrice,0),discount=Number(byId("discount").value||0),total=Math.max(0,subtotal-discount),paid=Number(byId("paid").value||0);if(paid<total)return alert("پارەی وەرگیراو کەمە");const saleId=uid("SALE");const sale={id:saleId,customerId:byId("saleCustomer").value,user:state.username,date:new Date().toISOString(),subtotal,discount,total,paid,change:paid-total,profit:0,paymentType:"cash"};let profit=-discount;state.cart.forEach(i=>{const b=batch(i.batchId);if(b)b.quantity-=i.qty;db.saleItems.unshift({id:uid("SI"),saleId,medicineId:i.medicineId,batchId:i.batchId,quantity:i.qty,sellPrice:i.sellPrice,buyPrice:i.buyPrice,total:i.qty*i.sellPrice});profit+=(i.sellPrice-i.buyPrice)*i.qty});sale.profit=profit;db.sales.unshift(sale);save();printReceipt(sale,state.cart);state.cart=[];render()}
-function medicinesHtml(){if(!canManage())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>${state.editingMedicine?'دەستکاری دەرمان':'زیادکردنی دەرمان'}</h2><label>کۆد</label><input id="mCode"><label>بارکۆد</label><input id="mBarcode"><label>ناوی دەرمان</label><input id="mName"><label>ناوی زانستی</label><input id="mSci"><div class="row"><div><label>جۆر</label><input id="mCategory"></div><div><label>کۆمپانیا</label><input id="mCompany"></div></div><div class="row"><div><label>یەکە</label><input id="mUnit" value="box"></div><div><label>ئاگاداری ستۆک</label><input id="mMin" type="number" value="5"></div></div><div class="row"><div><label>نرخی کڕین</label><input id="mBuy" type="number"></div><div><label>نرخی فرۆشتن</label><input id="mSell" type="number"></div></div><label><input id="mRx" type="checkbox" style="width:auto"> پێویستی بە ڕەچەتە هەیە</label><div class="actions" style="margin-top:12px"><button class="green" onclick="saveMedicine()">هەڵگرتن</button><button class="secondary" onclick="state.editingMedicine=null;render()">نوێ</button></div></div><div class="card"><h2>لیستی دەرمانەکان</h2><input id="medSearch" placeholder="گەڕان..." oninput="renderMedicineTable()"><div id="medicineTable" style="margin-top:12px"></div></div></div>`}function renderMedicineTable(){const box=byId("medicineTable");if(!box)return;const q=(byId("medSearch")?.value||"").toLowerCase();const rows=db.medicines.filter(m=>m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q)||String(m.barcode||"").includes(q)).map(m=>`<tr><td>${m.code}</td><td>${m.name}</td><td>${m.category||''}</td><td>${money(m.sellPrice)}</td><td><span class="badge ${totalStock(m.id)<=m.minStock?'red':''}">${totalStock(m.id)}</span></td><td>${m.requiresPrescription?'<span class="badge amber">Rx</span>':''}</td><td><button class="blue" onclick="editMedicine('${m.id}')">Edit</button><button class="red" onclick="deleteMedicine('${m.id}')">Delete</button></td></tr>`).join("");box.innerHTML=`<div class="tablewrap"><table><thead><tr><th>کۆد</th><th>ناو</th><th>جۆر</th><th>نرخ</th><th>ستۆک</th><th>Rx</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}function saveMedicine(){const id=state.editingMedicine||uid("M");const item={id,code:byId("mCode").value.trim(),barcode:byId("mBarcode").value.trim(),name:byId("mName").value.trim(),scientificName:byId("mSci").value.trim(),category:byId("mCategory").value.trim(),company:byId("mCompany").value.trim(),unit:byId("mUnit").value.trim()||"box",sellPrice:Number(byId("mSell").value||0),buyPrice:Number(byId("mBuy").value||0),minStock:Number(byId("mMin").value||0),requiresPrescription:byId("mRx").checked};if(!item.code||!item.name||!item.sellPrice)return alert("کۆد، ناو و نرخی فرۆشتن پێویستن");const idx=db.medicines.findIndex(x=>x.id===id);if(idx>=0)db.medicines[idx]=item;else db.medicines.unshift(item);save();state.editingMedicine=null;render()}function editMedicine(id){state.editingMedicine=id;render();const m=med(id);byId("mCode").value=m.code;byId("mBarcode").value=m.barcode||"";byId("mName").value=m.name;byId("mSci").value=m.scientificName||"";byId("mCategory").value=m.category||"";byId("mCompany").value=m.company||"";byId("mUnit").value=m.unit||"box";byId("mMin").value=m.minStock||0;byId("mBuy").value=m.buyPrice||0;byId("mSell").value=m.sellPrice||0;byId("mRx").checked=!!m.requiresPrescription}function deleteMedicine(id){if(db.saleItems.some(x=>x.medicineId===id))return alert("ئەم دەرمانە لە فرۆشتندا بەکارهاتووە");if(!confirm("دەرمان بسڕدرێتەوە؟"))return;db.medicines=db.medicines.filter(x=>x.id!==id);db.batches=db.batches.filter(x=>x.medicineId!==id);save();render()}
-function batchesHtml(){if(!canManage())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>زیادکردنی Batch / ستۆک</h2><label>دەرمان</label><select id="bMed">${db.medicines.map(m=>`<option value="${m.id}">${m.name} - ${m.code}</option>`).join("")}</select><label>Batch No</label><input id="bNo"><label>بەرواری بەسەرچوون</label><input id="bExpiry" type="date"><div class="row"><div><label>دانە</label><input id="bQty" type="number"></div><div><label>نرخی کڕین</label><input id="bBuy" type="number"></div></div><label>نرخی فرۆشتن</label><input id="bSell" type="number"><button class="green" style="margin-top:12px" onclick="addBatch()">زیادکردن</button></div><div class="card"><h2>Batch ـەکان</h2><input id="batchSearch" placeholder="گەڕان..." oninput="renderBatchTable()"><div id="batchTable" style="margin-top:12px"></div></div></div>`}function addBatch(){const medicineId=byId("bMed").value,m=med(medicineId);const item={id:uid("B"),medicineId,batchNo:byId("bNo").value.trim(),expiryDate:byId("bExpiry").value,quantity:Number(byId("bQty").value||0),buyPrice:Number(byId("bBuy").value||m.buyPrice||0),sellPrice:Number(byId("bSell").value||m.sellPrice||0)};if(!item.batchNo||!item.expiryDate||!item.quantity)return alert("Batch، بەسەرچوون و دانە پێویستن");db.batches.unshift(item);save();render()}function renderBatchTable(){const box=byId("batchTable");if(!box)return;const q=(byId("batchSearch")?.value||"").toLowerCase();const rows=db.batches.filter(b=>{const m=med(b.medicineId)||{};return String(b.batchNo||"").toLowerCase().includes(q)||String(m.name||"").toLowerCase().includes(q)}).map(b=>{const m=med(b.medicineId)||{},days=daysToExpiry(b.expiryDate);return `<tr class="${days<0?'expired':days<=60?'expiry-warn':''}"><td>${m.name||''}</td><td>${b.batchNo}</td><td>${b.expiryDate}</td><td>${days}</td><td><input type="number" value="${b.quantity}" style="width:80px" onchange="updateBatchQty('${b.id}',this.value)"></td><td>${money(b.sellPrice)}</td><td><button class="red" onclick="deleteBatch('${b.id}')">Delete</button></td></tr>`}).join("");box.innerHTML=`<div class="tablewrap"><table><thead><tr><th>دەرمان</th><th>Batch</th><th>بەسەرچوون</th><th>ڕۆژ</th><th>دانە</th><th>نرخ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}function updateBatchQty(id,v){const b=batch(id);if(b){b.quantity=Number(v||0);save();renderBatchTable()}}function deleteBatch(id){if(!confirm("Batch بسڕدرێتەوە؟"))return;db.batches=db.batches.filter(x=>x.id!==id);save();render()}
-function purchasesHtml(){if(!canManage())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>تۆمارکردنی کڕین</h2><label>دابینکەر</label><select id="pSupplier">${db.suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")}</select><label>ژمارەی وەسل</label><input id="pInvoice"><label>دەرمان</label><select id="pMed" onchange="fillPurchasePrices()">${db.medicines.map(m=>`<option value="${m.id}">${m.name} - ${m.code}</option>`).join("")}</select><label>Batch No</label><input id="pBatch"><label>بەسەرچوون</label><input id="pExpiry" type="date"><div class="row"><div><label>دانە</label><input id="pQty" type="number"></div><div><label>نرخی کڕین</label><input id="pBuy" type="number"></div></div><label>نرخی فرۆشتن</label><input id="pSell" type="number"><button class="green" style="margin-top:12px" onclick="savePurchase()">هەڵگرتن و زیادکردن بۆ ستۆک</button></div><div class="card"><h2>کڕینەکان</h2><div class="tablewrap"><table><thead><tr><th>کات</th><th>دابینکەر</th><th>وەسل</th><th>کۆ</th></tr></thead><tbody>${db.purchases.slice(0,100).map(p=>`<tr><td>${dateStr(p.date)}</td><td>${supplier(p.supplierId)?.name||''}</td><td>${p.invoiceNo||''}</td><td>${money(p.total)}</td></tr>`).join("")}</tbody></table></div></div></div>`}function fillPurchasePrices(){const m=med(byId("pMed").value);if(m){byId("pBuy").value=m.buyPrice||0;byId("pSell").value=m.sellPrice||0}}function savePurchase(){const mid=byId("pMed").value,m=med(mid),qty=Number(byId("pQty").value||0),buy=Number(byId("pBuy").value||0),sell=Number(byId("pSell").value||0);if(!mid||!qty||!byId("pBatch").value||!byId("pExpiry").value)return alert("زانیارییەکان تەواو بکە");const purchase={id:uid("P"),supplierId:byId("pSupplier").value,invoiceNo:byId("pInvoice").value.trim(),date:new Date().toISOString(),subtotal:qty*buy,discount:0,total:qty*buy,paid:qty*buy,debt:0,note:""};db.purchases.unshift(purchase);db.purchaseItems.unshift({id:uid("PI"),purchaseId:purchase.id,medicineId:mid,batchNo:byId("pBatch").value.trim(),expiryDate:byId("pExpiry").value,quantity:qty,buyPrice:buy,sellPrice:sell,total:qty*buy});db.batches.unshift({id:uid("B"),medicineId:mid,batchNo:byId("pBatch").value.trim(),expiryDate:byId("pExpiry").value,quantity:qty,buyPrice:buy,sellPrice:sell});if(m){m.buyPrice=buy;m.sellPrice=sell}save();render()}
-function suppliersHtml(){if(!canManage())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>دابینکەر</h2><label>ناو</label><input id="sName"><label>مۆبایل</label><input id="sPhone"><label>ناونیشان</label><input id="sAddress"><label>تێبینی</label><textarea id="sNote"></textarea><button class="green" style="margin-top:12px" onclick="saveSupplier()">هەڵگرتن</button></div><div class="card"><h2>لیستی دابینکەران</h2><div id="supplierTable"></div></div></div>`}function saveSupplier(){const item={id:uid("S"),name:byId("sName").value.trim(),phone:byId("sPhone").value.trim(),address:byId("sAddress").value.trim(),note:byId("sNote").value.trim()};if(!item.name)return alert("ناو بنووسە");db.suppliers.unshift(item);save();render()}function renderSupplierTable(){const box=byId("supplierTable");if(!box)return;box.innerHTML=`<div class="tablewrap"><table><thead><tr><th>ناو</th><th>مۆبایل</th><th>ناونیشان</th><th></th></tr></thead><tbody>${db.suppliers.map(s=>`<tr><td>${s.name}</td><td>${s.phone||''}</td><td>${s.address||''}</td><td><button class="red" onclick="deleteSupplier('${s.id}')">Delete</button></td></tr>`).join("")}</tbody></table></div>`}function deleteSupplier(id){if(!confirm("بسڕدرێتەوە؟"))return;db.suppliers=db.suppliers.filter(x=>x.id!==id);save();render()}
-function customersHtml(){return `<div class="grid two"><div class="card"><h2>کڕیار</h2><label>ناو</label><input id="cName"><label>مۆبایل</label><input id="cPhone"><label>ناونیشان</label><input id="cAddress"><button class="green" style="margin-top:12px" onclick="saveCustomer()">هەڵگرتن</button></div><div class="card"><h2>لیستی کڕیاران</h2><div id="customerTable"></div></div></div>`}function saveCustomer(){const item={id:uid("C"),name:byId("cName").value.trim(),phone:byId("cPhone").value.trim(),address:byId("cAddress").value.trim()};if(!item.name)return alert("ناو بنووسە");db.customers.unshift(item);save();render()}function renderCustomerTable(){const box=byId("customerTable");if(!box)return;box.innerHTML=`<div class="tablewrap"><table><thead><tr><th>ناو</th><th>مۆبایل</th><th>کۆی کڕین</th><th></th></tr></thead><tbody>${db.customers.map(c=>{const total=db.sales.filter(s=>s.customerId===c.id).reduce((a,s)=>a+s.total,0);return `<tr><td>${c.name}</td><td>${c.phone||''}</td><td>${money(total)}</td><td><button class="red" onclick="deleteCustomer('${c.id}')">Delete</button></td></tr>`}).join("")}</tbody></table></div>`}function deleteCustomer(id){if(id==="C1")return alert("ئەم کڕیارە بنەڕەتییە");db.customers=db.customers.filter(x=>x.id!==id);save();render()}
-function prescriptionsHtml(){return `<div class="grid two"><div class="card"><h2>ڕەچەتە</h2><label>کڕیار</label><select id="rxCustomer">${db.customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}</select><label>ناوی دکتۆر</label><input id="rxDoctor"><label>ژمارەی ڕەچەتە</label><input id="rxNo"><label>تێبینی</label><textarea id="rxNote"></textarea><button class="green" style="margin-top:12px" onclick="saveRx()">هەڵگرتن</button></div><div class="card"><h2>ڕەچەتەکان</h2><div class="tablewrap"><table><thead><tr><th>کات</th><th>کڕیار</th><th>دکتۆر</th><th>ژمارە</th></tr></thead><tbody>${db.prescriptions.map(r=>`<tr><td>${dateStr(r.date)}</td><td>${customer(r.customerId)?.name||''}</td><td>${r.doctorName||''}</td><td>${r.prescriptionNo||''}</td></tr>`).join("")}</tbody></table></div></div></div>`}function saveRx(){db.prescriptions.unshift({id:uid("RX"),customerId:byId("rxCustomer").value,doctorName:byId("rxDoctor").value.trim(),prescriptionNo:byId("rxNo").value.trim(),note:byId("rxNote").value.trim(),date:new Date().toISOString()});save();render()}
-function expensesHtml(){if(!canManage())return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>زیادکردنی مەسروف</h2><label>ناونیشان</label><input id="exTitle"><label>بڕ</label><input id="exAmount" type="number"><label>تێبینی</label><textarea id="exNote"></textarea><button class="green" style="margin-top:12px" onclick="addExpense()">زیادکردن</button></div><div class="card"><h2>مەسروفات</h2><div id="expenseTable"></div></div></div>`}function addExpense(){const item={id:uid("E"),title:byId("exTitle").value.trim(),amount:Number(byId("exAmount").value||0),note:byId("exNote").value.trim(),date:new Date().toISOString()};if(!item.title||!item.amount)return alert("ناونیشان و بڕ پێویستن");db.expenses.unshift(item);save();render()}function renderExpenseTable(){const box=byId("expenseTable");if(!box)return;box.innerHTML=`<div class="tablewrap"><table><thead><tr><th>کات</th><th>ناو</th><th>بڕ</th><th></th></tr></thead><tbody>${db.expenses.map(e=>`<tr><td>${dateStr(e.date)}</td><td>${e.title}</td><td>${money(e.amount)}</td><td><button class="red" onclick="deleteExpense('${e.id}')">X</button></td></tr>`).join("")}</tbody></table></div>`}function deleteExpense(id){db.expenses=db.expenses.filter(x=>x.id!==id);save();render()}
-function reportsHtml(){const d=db.sales.filter(s=>String(s.date).slice(0,10)===today()),exp=db.expenses.filter(e=>String(e.date).slice(0,10)===today()).reduce((a,e)=>a+e.amount,0);const total=d.reduce((s,x)=>s+x.total,0),profit=d.reduce((s,x)=>s+x.profit,0),disc=d.reduce((s,x)=>s+x.discount,0);return `<div class="grid four"><div class="card"><div class="muted">فرۆشتنی ئەمڕۆ</div><div class="kpi">${money(total)}</div></div><div class="card"><div class="muted">قازانج</div><div class="kpi">${money(profit-exp)}</div></div><div class="card"><div class="muted">داشکاندن</div><div class="kpi">${money(disc)}</div></div><div class="card"><div class="muted">مەسروف</div><div class="kpi">${money(exp)}</div></div></div><div class="card" style="margin-top:14px"><h2>فرۆشتنەکان</h2>${salesTable(200)}</div>`}function salesTable(limit){return `<div class="tablewrap"><table><thead><tr><th>کات</th><th>کڕیار</th><th>کۆ</th><th>قازانج</th></tr></thead><tbody>${db.sales.slice(0,limit).map(s=>`<tr><td>${dateStr(s.date)}</td><td>${customer(s.customerId)?.name||''}</td><td>${money(s.total)}</td><td>${money(s.profit)}</td></tr>`).join("")||'<tr><td colspan="4" class="muted">هیچ فرۆشتنێک نییە</td></tr>'}</tbody></table></div>`}
-function settingsHtml(){if(state.role!=="admin")return `<div class="card"><h2>ڕێگەپێنەدراوە</h2></div>`;return `<div class="grid two"><div class="card"><h2>ڕێکخستن</h2><label>ناوی دەرمانخانە</label><input id="setName" value="${db.settings.pharmacyName}"><label>مۆبایل</label><input id="setPhone" value="${db.settings.phone}"><label>ناونیشان</label><input id="setAddress" value="${db.settings.address}"><label>تێبینی وەسل</label><input id="setNote" value="${db.settings.receiptNote}"><label>پاسۆردی نوێی Admin</label><input id="setPass" type="password" placeholder="بەتاڵی بهێڵە ئەگەر ناگۆڕیت"><button class="green" style="margin-top:12px" onclick="saveSettings()">هەڵگرتن</button></div><div class="card"><h2>Backup / Restore</h2><div class="actions"><button class="blue" onclick="exportBackup()">Export Backup</button><button class="amber" onclick="byId('importFile').click()">Import Backup</button><input id="importFile" class="hidden" type="file" accept=".json" onchange="importBackup(event)"></div><p class="muted">هەفتانە باکەپ بکە.</p><button class="red" onclick="resetSystem()">Reset System</button></div></div>`}function saveSettings(){db.settings.pharmacyName=byId("setName").value.trim()||"AR Pharmacy POS";db.settings.phone=byId("setPhone").value.trim();db.settings.address=byId("setAddress").value.trim();db.settings.receiptNote=byId("setNote").value.trim();const p=byId("setPass").value;if(p){db.settings.password=p;const u=db.users.find(x=>x.role==="admin");if(u)u.password=p}save();render()}function exportBackup(){const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ar-pharmacy-pos-backup.json";a.click()}function importBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert("Backup گەڕایەوە");render()}catch{alert("فایل هەڵەیە")}};r.readAsText(f)}function resetSystem(){if(confirm("دڵنیایت هەموو داتا بسڕدرێتەوە؟")){localStorage.removeItem(LS);db=load();state.cart=[];render()}}
-function printReceipt(sale,items){const lines=items.map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${money(i.qty*i.sellPrice)}</td></tr>`).join("");const area=byId("printArea");area.innerHTML=`<div class="receipt"><div class="receipt-head"><div class="receipt-logo">PH</div><h3>${db.settings.pharmacyName}</h3><p>${db.settings.phone}</p><p>${db.settings.address}</p></div><p><b>Receipt:</b> ${sale.id}</p><p><b>Date:</b> ${dateStr(sale.date)}</p><p><b>Customer:</b> ${customer(sale.customerId)?.name||''}</p><hr><table><thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead><tbody>${lines}</tbody></table><hr><div class="receipt-total"><p>Subtotal: ${money(sale.subtotal)}</p><p>Discount: ${money(sale.discount)}</p><h3>Total: ${money(sale.total)}</h3><p>Paid: ${money(sale.paid)}</p><p>Change: ${money(sale.change)}</p></div><p style="text-align:center">${db.settings.receiptNote}</p></div>`;area.classList.remove("hidden");document.body.classList.add("printing");setTimeout(()=>window.print(),300);const clean=()=>{document.body.classList.remove("printing");area.classList.add("hidden");area.innerHTML="";window.removeEventListener("afterprint",clean)};window.addEventListener("afterprint",clean);setTimeout(()=>{if(document.body.classList.contains("printing"))clean()},30000)}
-Object.assign(window,{login,logout,go,renderMedGrid,addToCart,setCartQty,removeCart,clearCart,checkout,saveMedicine,editMedicine,deleteMedicine,addBatch,renderBatchTable,updateBatchQty,deleteBatch,fillPurchasePrices,savePurchase,saveSupplier,deleteSupplier,saveCustomer,deleteCustomer,saveRx,addExpense,deleteExpense,saveSettings,exportBackup,importBackup,resetSystem,state,byId});render();
+}
+
+function byId(id) { return document.getElementById(id); }
+function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function money(n) { return Number(n || 0).toLocaleString() + " IQD"; }
+function today() { return new Date().toISOString().slice(0, 10); }
+function month() { return new Date().toISOString().slice(0, 7); }
+function dateStr(d) { return new Date(d).toLocaleString(); }
+function med(id) { return db.medicines.find(x => x.id === id); }
+function batch(id) { return db.batches.find(x => x.id === id); }
+function customer(id) { return db.customers.find(x => x.id === id); }
+function supplier(id) { return db.suppliers.find(x => x.id === id); }
+
+function totalStock(mid) {
+  return db.batches.filter(b => b.medicineId === mid).reduce((s, b) => s + Number(b.quantity || 0), 0);
+}
+
+function validBatches(mid) {
+  return db.batches
+    .filter(b => b.medicineId === mid && Number(b.quantity) > 0)
+    .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)));
+}
+
+function daysToExpiry(date) {
+  return Math.ceil((new Date(date + "T00:00:00") - new Date()) / (1000 * 60 * 60 * 24));
+}
+
+function canManage() { return state.role === "admin" || state.role === "pharmacist"; }
+function canSell() { return state.role === "admin" || state.role === "cashier" || state.role === "pharmacist"; }
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, m => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[m]));
+}
+
+function render() {
+  const app = byId("app");
+
+  if (!state.logged) {
+    app.innerHTML = `
+      <div class="login card">
+        <div class="logo">PH</div>
+        <h2>ÚÙÙÙÛÚÙÙØ±ÛÙÛ</h2>
+        <p class="muted">AR Pharmacy POS</p>
+        <div class="notice">Ø³ÛØ³ØªÛÙÛ Ø¨ÛÚÛÙÛØ¨Ø±Ø¯ÙÛ Ø¯ÛØ±ÙØ§ÙØ®Ø§ÙÛØ Ú©Ø§Ø´ÛØ±Ø Ø³ØªÛÚ©Ø Ø¨ÛØ±ÙØ§Ø±Û Ø¨ÛØ³ÛØ±ÚÙÙÙ Ù ÚØ§Ù¾ÛØ±Øª</div>
+        <label>Email</label>
+        <input id="loginUser" placeholder="Email" autocomplete="email">
+        <label>Password</label>
+        <input id="loginPass" type="password" placeholder="Password">
+        <button onclick="login()" style="margin-top:12px">ÚÙÙÙÛÚÙÙØ±ÛÙÛ</button>
+        <p class="small muted">Ø¨Û Firebase Email Ù Password Ø¨ÚÛ ÚÙÙØ±ÛÙÛ.</p>
+      </div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="app">
+      <div class="topbar">
+        <div class="brand"><span class="brandmark">PH</span>${esc(db.settings.pharmacyName)}<span class="badge blue">${esc(state.role)}</span></div>
+        <div class="actions"><span class="badge">${new Date().toLocaleDateString()}</span><button class="secondary" onclick="logout()">ÚÙÙÙÛØ¯ÛØ±ÛÙÛ</button></div>
+      </div>
+      <div class="layout">
+        <div class="sidebar">
+          ${nav("dashboard", "Ø¯Ø§Ø´Ø¨ÛØ±Ø¯")}
+          ${nav("pos", "ÙØ±ÛØ´ØªÙ / POS")}
+          ${nav("medicines", "Ø¯ÛØ±ÙØ§ÙÛÚ©Ø§Ù")}
+          ${nav("batches", "Ú©ÛÚ¯Ø§ Ù Ø¨ÛØ³ÛØ±ÚÙÙÙ")}
+          ${nav("purchases", "Ú©ÚÛÙ")}
+          ${nav("suppliers", "Ø¯Ø§Ø¨ÛÙÚ©ÛØ±Ø§Ù")}
+          ${nav("customers", "Ú©ÚÛØ§Ø±Ø§Ù")}
+          ${nav("prescriptions", "ÚÛÚÛØªÛÚ©Ø§Ù")}
+          ${nav("expenses", "ÙÛØ³Ø±ÙÙØ§Øª")}
+          ${nav("reports", "ÚØ§Ù¾ÛØ±Øª")}
+          ${nav("settings", "ÚÛÚ©Ø®Ø³ØªÙ")}
+        </div>
+        <div class="content">${pageHtml()}</div>
+      </div>
+    </div>
+    <div id="printArea" class="hidden"></div>
+  `;
+
+  afterRender();
+}
+
+function nav(p, t) { return `<button class="navbtn ${state.page === p ? "active" : ""}" onclick="go('${p}')">${t}</button>`; }
+function go(p) { state.page = p; render(); }
+
+async function login() {
+  const email = byId("loginUser").value.trim();
+  const p = byId("loginPass").value;
+
+  try {
+    if (!window.AR_PHARMACY_CLOUD) {
+      alert("Firebase Ø¦Ø§ÙØ§Ø¯Û ÙÛÛÛ");
+      return;
+    }
+
+    const cloudUser = await window.AR_PHARMACY_CLOUD.login(email, p);
+    db = load();
+    state.logged = true;
+    state.role = cloudUser.role || "admin";
+    state.username = cloudUser.email || email;
+    state.page = "dashboard";
+    save();
+    render();
+  } catch (err) {
+    console.log(err);
+    alert("ÙÛÚµÛ: " + (err.code || err.message || String(err)));
+  }
+}
+
+async function logout() {
+  if (window.AR_PHARMACY_CLOUD) {
+    await window.AR_PHARMACY_CLOUD.logout().catch(console.log);
+  }
+  state.logged = false;
+  state.role = "";
+  state.cart = [];
+  render();
+}
+
+function pageHtml() {
+  if (state.page === "dashboard") return dashboardHtml();
+  if (state.page === "pos") return posHtml();
+  if (state.page === "medicines") return medicinesHtml();
+  if (state.page === "batches") return batchesHtml();
+  if (state.page === "purchases") return purchasesHtml();
+  if (state.page === "suppliers") return suppliersHtml();
+  if (state.page === "customers") return customersHtml();
+  if (state.page === "prescriptions") return prescriptionsHtml();
+  if (state.page === "expenses") return expensesHtml();
+  if (state.page === "reports") return reportsHtml();
+  return settingsHtml();
+}
+
+function afterRender() {
+  if (state.page === "pos") renderMedGrid();
+  if (state.page === "medicines") renderMedicineTable();
+  if (state.page === "batches") renderBatchTable();
+  if (state.page === "suppliers") renderSupplierTable();
+  if (state.page === "customers") renderCustomerTable();
+  if (state.page === "expenses") renderExpenseTable();
+}
+
+function dashboardHtml() {
+  const salesToday = db.sales.filter(s => String(s.date).slice(0, 10) === today());
+  const salesMonth = db.sales.filter(s => String(s.date).slice(0, 7) === month());
+  const todayTotal = salesToday.reduce((s, x) => s + Number(x.total || 0), 0);
+  const monthTotal = salesMonth.reduce((s, x) => s + Number(x.total || 0), 0);
+  const profitToday = salesToday.reduce((s, x) => s + Number(x.profit || 0), 0);
+  const low = db.medicines.filter(m => totalStock(m.id) <= Number(m.minStock || 0)).length;
+  const exp = db.batches.filter(b => Number(b.quantity) > 0 && daysToExpiry(b.expiryDate) <= 60).length;
+
+  return `
+    <div class="grid four">
+      <div class="card"><div class="muted">ÙØ±ÛØ´ØªÙÛ Ø¦ÛÙÚÛ</div><div class="kpi">${money(todayTotal)}</div></div>
+      <div class="card"><div class="muted">ÙØ§Ø²Ø§ÙØ¬Û Ø¦ÛÙÚÛ</div><div class="kpi">${money(profitToday)}</div></div>
+      <div class="card"><div class="muted">ÙØ±ÛØ´ØªÙÛ ÙØ§ÙÚ¯</div><div class="kpi">${money(monthTotal)}</div></div>
+      <div class="card"><div class="muted">Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±Û</div><div class="kpi">${low + exp}</div></div>
+    </div>
+    <div class="grid two" style="margin-top:14px">
+      <div class="card"><h2>Ø³ØªÛÚ©Û Ú©ÛÙ</h2>${lowStockTable()}</div>
+      <div class="card"><h2>Ø¨ÛØ³ÛØ±ÚÙÙÙ ÙØ²ÛÚ©</h2>${expiryTable()}</div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ø¯ÙØ§ÛÛÙ ÙØ±ÛØ´ØªÙÛÚ©Ø§Ù</h2>${salesTable(12)}</div>
+  `;
+}
+
+function lowStockTable() {
+  const rows = db.medicines
+    .filter(m => totalStock(m.id) <= Number(m.minStock || 0))
+    .map(m => `<tr><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${totalStock(m.id)}</td><td>${m.minStock}</td></tr>`)
+    .join("");
+
+  return `<div class="tablewrap"><table><thead><tr><th>Ú©ÛØ¯</th><th>Ø¯ÛØ±ÙØ§Ù</th><th>Ø³ØªÛÚ©</th><th>Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±Û</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="muted">ÙÛÚ Ø¯ÛØ±ÙØ§ÙÛÚ© Ú©ÛÙ ÙÛÛÛ</td></tr>'}</tbody></table></div>`;
+}
+
+function expiryTable() {
+  const rows = db.batches
+    .filter(b => Number(b.quantity) > 0 && daysToExpiry(b.expiryDate) <= 60)
+    .sort((a, b) => daysToExpiry(a.expiryDate) - daysToExpiry(b.expiryDate))
+    .map(b => {
+      const m = med(b.medicineId) || {};
+      const days = daysToExpiry(b.expiryDate);
+      return `<tr class="${days < 0 ? "expired" : "expiry-warn"}"><td>${esc(m.name || "")}</td><td>${esc(b.batchNo)}</td><td>${esc(b.expiryDate)}</td><td>${days}</td><td>${b.quantity}</td></tr>`;
+    })
+    .join("");
+
+  return `<div class="tablewrap"><table><thead><tr><th>Ø¯ÛØ±ÙØ§Ù</th><th>Batch</th><th>Ø¨ÛØ³ÛØ±ÚÙÙÙ</th><th>ÚÛÚ</th><th>Ø¯Ø§ÙÛ</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="muted">ÙÛÚ Ø¨ÛØ³ÛØ±ÚÙÙÙÛÚ©Û ÙØ²ÛÚ© ÙÛÛÛ</td></tr>'}</tbody></table></div>`;
+}
+
+function posHtml() {
+  if (!canSell()) return `<div class="card"><h2>ÚÛÚ¯ÛÙ¾ÛÙÛØ¯Ø±Ø§ÙÛ</h2></div>`;
+
+  const subtotal = state.cart.reduce((s, i) => s + i.qty * i.sellPrice, 0);
+  const discount = Number(byId("discount")?.value || 0);
+  const total = Math.max(0, subtotal - discount);
+
+  return `
+    <div class="grid two">
+      <div class="card">
+        <h2>ÙØ±ÛØ´ØªÙ / POS</h2>
+        <div class="row"><input id="posSearch" placeholder="Ú¯ÛÚØ§Ù Ø¨Û ÙØ§ÙØ Ú©ÛØ¯ ÛØ§Ù Ø¨Ø§Ø±Ú©ÛØ¯..." oninput="renderMedGrid()"><button class="secondary" onclick="byId('posSearch').value='';renderMedGrid()">Ù¾Ø§Ú©</button></div>
+        <div class="actions" style="margin-top:10px"><button class="secondary" onclick="state.selectedCategory='';renderMedGrid()">ÙÛÙÙÙ</button>${[...new Set(db.medicines.map(x => x.category || "Other"))].map(c => `<button class="secondary" onclick="state.selectedCategory='${esc(c)}';renderMedGrid()">${esc(c)}</button>`).join("")}</div>
+        <div id="medGrid" class="medicine-grid"></div>
+      </div>
+      <div class="card">
+        <h2>Ø³ÛØ¨ÛØªÛ</h2>
+        <label>Ú©ÚÛØ§Ø±</label>
+        <select id="saleCustomer">${db.customers.map(c => `<option value="${c.id}">${esc(c.name)}${c.phone ? " - " + esc(c.phone) : ""}</option>`).join("")}</select>
+        <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Ø¯ÛØ±ÙØ§Ù</th><th>Batch</th><th>Ø¯Ø§ÙÛ</th><th>Ú©Û</th><th></th></tr></thead><tbody>${state.cart.map((i, idx) => `<tr><td>${esc(i.name)}</td><td>${esc(i.batchNo)}</td><td><input type="number" min="1" max="${i.available}" value="${i.qty}" style="width:75px" onchange="setCartQty(${idx},this.value)"></td><td>${money(i.qty * i.sellPrice)}</td><td><button class="red" onclick="removeCart(${idx})">X</button></td></tr>`).join("") || '<tr><td colspan="5" class="muted">Ø³ÛØ¨ÛØªÛ Ø¨ÛØªØ§ÚµÛ</td></tr>'}</tbody></table></div>
+        <div class="row"><div><label>Ø¯Ø§Ø´Ú©Ø§ÙØ¯Ù</label><input id="discount" type="number" value="0" oninput="render()"></div><div><label>Ù¾Ø§Ø±ÛÛ ÙÛØ±Ú¯ÛØ±Ø§Ù</label><input id="paid" type="number" value="${total}"></div></div>
+        <div class="kpi">${money(total)}</div>
+        <div class="actions" style="margin-top:12px"><button class="green" onclick="checkout()">ÙØ±ÛØ´ØªÙ Ù ÚØ§Ù¾</button><button class="secondary" onclick="clearCart()">Ù¾Ø§Ú©Ú©Ø±Ø¯ÙÛÙÛ</button></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMedGrid() {
+  const box = byId("medGrid");
+  if (!box) return;
+
+  const q = (byId("posSearch")?.value || "").toLowerCase();
+  const items = db.medicines.filter(m =>
+    (!state.selectedCategory || m.category === state.selectedCategory) &&
+    (String(m.name).toLowerCase().includes(q) || String(m.code).toLowerCase().includes(q) || String(m.barcode || "").includes(q))
+  );
+
+  box.innerHTML = items.map(m => `<button class="medbtn" onclick="addToCart('${m.id}')"><b>${esc(m.name)}</b><span>${esc(m.code)} / ${esc(m.category)}</span><span>Stock: ${totalStock(m.id)}</span><strong>${money(m.sellPrice)}</strong>${m.requiresPrescription ? '<span class="badge amber">ÚÛÚÛØªÛ Ù¾ÛÙÛØ³ØªÛ</span>' : ""}</button>`).join("");
+}
+
+function addToCart(mid) {
+  const m = med(mid);
+  if (!m) return;
+
+  const batches = validBatches(mid);
+  if (!batches.length) return alert("Ø¦ÛÙ Ø¯ÛØ±ÙØ§ÙÛ Ø³ØªÛÚ©Û ÙÛÛÛ");
+
+  const b = batches[0];
+  const ex = state.cart.find(x => x.batchId === b.id);
+
+  if (ex) {
+    if (ex.qty + 1 > Number(b.quantity)) return alert("Ø³ØªÛÚ© Ø¨ÛØ³ ÙÛÛÛ");
+    ex.qty++;
+  } else {
+    state.cart.push({
+      medicineId: m.id,
+      batchId: b.id,
+      batchNo: b.batchNo,
+      name: m.name,
+      qty: 1,
+      available: Number(b.quantity),
+      sellPrice: Number(b.sellPrice || m.sellPrice),
+      buyPrice: Number(b.buyPrice || m.buyPrice)
+    });
+  }
+
+  render();
+}
+
+function setCartQty(idx, v) {
+  const i = state.cart[idx];
+  if (!i) return;
+  i.qty = Math.max(1, Math.min(Number(i.available), Number(v || 1)));
+  render();
+}
+
+function removeCart(idx) { state.cart.splice(idx, 1); render(); }
+function clearCart() { state.cart = []; render(); }
+
+function checkout() {
+  if (!state.cart.length) return alert("Ø³ÛØ¨ÛØªÛ Ø¨ÛØªØ§ÚµÛ");
+
+  const subtotal = state.cart.reduce((s, i) => s + i.qty * i.sellPrice, 0);
+  const discount = Number(byId("discount")?.value || 0);
+  const total = Math.max(0, subtotal - discount);
+  const paid = Number(byId("paid")?.value || 0);
+  const change = paid - total;
+
+  if (paid < total) return alert("Ù¾Ø§Ø±ÛÛ ÙÛØ±Ú¯ÛØ±Ø§Ù Ú©ÛÙÛ");
+
+  const saleId = uid("SA");
+  const sale = { id: saleId, date: new Date().toISOString(), customerId: byId("saleCustomer").value, subtotal, discount, total, paid, change, profit: 0, user: state.username };
+
+  for (const item of state.cart) {
+    const b = batch(item.batchId);
+    if (!b || Number(b.quantity) < item.qty) return alert("Ø³ØªÛÚ© Ø¨ÛØ³ ÙÛÛÛ");
+
+    b.quantity = Number(b.quantity) - item.qty;
+    const profit = (item.sellPrice - item.buyPrice) * item.qty;
+    sale.profit += profit;
+
+    db.saleItems.push({ id: uid("SI"), saleId, medicineId: item.medicineId, batchId: item.batchId, batchNo: item.batchNo, name: item.name, qty: item.qty, sellPrice: item.sellPrice, buyPrice: item.buyPrice, total: item.qty * item.sellPrice, profit });
+  }
+
+  db.sales.push(sale);
+  state.cart = [];
+  save();
+  printReceipt(saleId);
+  render();
+}
+
+function printReceipt(saleId) {
+  const sale = db.sales.find(x => x.id === saleId);
+  if (!sale) return;
+
+  const items = db.saleItems.filter(x => x.saleId === saleId);
+  const c = customer(sale.customerId) || {};
+
+  const html = `<div style="font-family:Arial;padding:12px;direction:rtl"><h2>${esc(db.settings.pharmacyName)}</h2><p>${esc(db.settings.address)}<br>${esc(db.settings.phone)}</p><hr><p>ÚÙØ§Ø±ÛÛ ÙÛØ³Ù: ${sale.id}</p><p>Ú©ÚÛØ§Ø±: ${esc(c.name || "")}</p><p>Ø¨ÛØ±ÙØ§Ø±: ${dateStr(sale.date)}</p><table style="width:100%;border-collapse:collapse" border="1"><thead><tr><th>Ø¯ÛØ±ÙØ§Ù</th><th>Ø¯Ø§ÙÛ</th><th>ÙØ±Ø®</th><th>Ú©Û</th></tr></thead><tbody>${items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.sellPrice)}</td><td>${money(i.total)}</td></tr>`).join("")}</tbody></table><h3>Ú©ÛÛ Ú¯Ø´ØªÛ: ${money(sale.total)}</h3><p>${esc(db.settings.receiptNote)}</p></div>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return alert("Popup ÚÛÚ¯ÛÙ¾ÛÙÛØ¯Ø±Ø§ÙÛ");
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+function salesTable(limit = 50) {
+  const rows = [...db.sales]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, limit)
+    .map(s => {
+      const c = customer(s.customerId) || {};
+      return `<tr><td>${dateStr(s.date)}</td><td>${esc(c.name || "")}</td><td>${money(s.total)}</td><td>${money(s.profit)}</td><td>${esc(s.user || "")}</td></tr>`;
+    })
+    .join("");
+
+  return `<div class="tablewrap"><table><thead><tr><th>Ø¨ÛØ±ÙØ§Ø±</th><th>Ú©ÚÛØ§Ø±</th><th>Ú©Û</th><th>ÙØ§Ø²Ø§ÙØ¬</th><th>User</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="muted">ÙÛÚ ÙØ±ÛØ´ØªÙÛÚ© ÙÛÛÛ</td></tr>'}</tbody></table></div>`;
+}
+
+function medicinesHtml() {
+  if (!canManage()) return `<div class="card"><h2>ÚÛÚ¯ÛÙ¾ÛÙÛØ¯Ø±Ø§ÙÛ</h2></div>`;
+
+  return `
+    <div class="card">
+      <h2>Ø²ÛØ§Ø¯Ú©Ø±Ø¯ÙÛ Ø¯ÛØ±ÙØ§Ù</h2>
+      <div class="grid two">
+        <div><label>Ú©ÛØ¯</label><input id="mCode" placeholder="M004"></div>
+        <div><label>Ø¨Ø§Ø±Ú©ÛØ¯</label><input id="mBarcode"></div>
+        <div><label>ÙØ§Ù</label><input id="mName"></div>
+        <div><label>ÙØ§ÙÛ Ø²Ø§ÙØ³ØªÛ</label><input id="mScientific"></div>
+        <div><label>Ø¬ÛØ±</label><input id="mCategory"></div>
+        <div><label>Ú©ÛÙÙ¾Ø§ÙÛØ§</label><input id="mCompany"></div>
+        <div><label>ÛÛÚ©Û</label><input id="mUnit" value="box"></div>
+        <div><label>ÙØ±Ø®Û ÙØ±ÛØ´ØªÙ</label><input id="mSell" type="number"></div>
+        <div><label>ÙØ±Ø®Û Ú©ÚÛÙ</label><input id="mBuy" type="number"></div>
+        <div><label>Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±Û Ø³ØªÛÚ©</label><input id="mMin" type="number" value="5"></div>
+      </div>
+      <label><input id="mPrescription" type="checkbox"> ÚÛÚÛØªÛ Ù¾ÛÙÛØ³ØªÛ</label>
+      <button onclick="addMedicine()" style="margin-top:12px">Ø²ÛØ§Ø¯Ú©Ø±Ø¯Ù</button>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ø¯ÛØ±ÙØ§ÙÛÚ©Ø§Ù</h2><div id="medicineTable"></div></div>
+  `;
+}
+
+function addMedicine() {
+  const name = byId("mName").value.trim();
+  if (!name) return alert("ÙØ§ÙÛ Ø¯ÛØ±ÙØ§Ù Ø¨ÙÙÙØ³Û");
+
+  db.medicines.push({
+    id: uid("M"),
+    code: byId("mCode").value.trim() || uid("C"),
+    barcode: byId("mBarcode").value.trim(),
+    name,
+    scientificName: byId("mScientific").value.trim(),
+    category: byId("mCategory").value.trim() || "Other",
+    company: byId("mCompany").value.trim(),
+    unit: byId("mUnit").value.trim() || "box",
+    sellPrice: Number(byId("mSell").value || 0),
+    buyPrice: Number(byId("mBuy").value || 0),
+    minStock: Number(byId("mMin").value || 0),
+    requiresPrescription: byId("mPrescription").checked
+  });
+
+  save();
+  render();
+}
+
+function deleteMedicine(id) {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ")) return;
+  db.medicines = db.medicines.filter(x => x.id !== id);
+  db.batches = db.batches.filter(x => x.medicineId !== id);
+  save();
+  render();
+}
+
+function renderMedicineTable() {
+  const box = byId("medicineTable");
+  if (!box) return;
+
+  box.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Ú©ÛØ¯</th><th>ÙØ§Ù</th><th>Ø¬ÛØ±</th><th>Ø³ØªÛÚ©</th><th>ÙØ±Ø®</th><th></th></tr></thead><tbody>${db.medicines.map(m => `<tr><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${esc(m.category)}</td><td>${totalStock(m.id)}</td><td>${money(m.sellPrice)}</td><td><button class="red" onclick="deleteMedicine('${m.id}')">Ø³ÚÛÙÛÙÛ</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function batchesHtml() {
+  if (!canManage()) return `<div class="card"><h2>ÚÛÚ¯ÛÙ¾ÛÙÛØ¯Ø±Ø§ÙÛ</h2></div>`;
+
+  return `
+    <div class="card">
+      <h2>Ø²ÛØ§Ø¯Ú©Ø±Ø¯ÙÛ Batch / Ø³ØªÛÚ©</h2>
+      <div class="grid two">
+        <div><label>Ø¯ÛØ±ÙØ§Ù</label><select id="bMed">${db.medicines.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select></div>
+        <div><label>Batch No</label><input id="bNo"></div>
+        <div><label>Expiry Date</label><input id="bExp" type="date"></div>
+        <div><label>Quantity</label><input id="bQty" type="number"></div>
+        <div><label>Buy Price</label><input id="bBuy" type="number"></div>
+        <div><label>Sell Price</label><input id="bSell" type="number"></div>
+      </div>
+      <button onclick="addBatch()" style="margin-top:12px">Ø²ÛØ§Ø¯Ú©Ø±Ø¯Ù</button>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ú©ÛÚ¯Ø§</h2><div id="batchTable"></div></div>
+  `;
+}
+
+function addBatch() {
+  const medicineId = byId("bMed").value;
+  const m = med(medicineId);
+
+  db.batches.push({
+    id: uid("B"),
+    medicineId,
+    batchNo: byId("bNo").value.trim() || uid("B"),
+    expiryDate: byId("bExp").value || today(),
+    quantity: Number(byId("bQty").value || 0),
+    buyPrice: Number(byId("bBuy").value || m.buyPrice || 0),
+    sellPrice: Number(byId("bSell").value || m.sellPrice || 0)
+  });
+
+  save();
+  render();
+}
+
+function deleteBatch(id) {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ")) return;
+  db.batches = db.batches.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function renderBatchTable() {
+  const box = byId("batchTable");
+  if (!box) return;
+
+  box.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Ø¯ÛØ±ÙØ§Ù</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Buy</th><th>Sell</th><th></th></tr></thead><tbody>${db.batches.map(b => { const m = med(b.medicineId) || {}; return `<tr><td>${esc(m.name || "")}</td><td>${esc(b.batchNo)}</td><td>${esc(b.expiryDate)}</td><td>${b.quantity}</td><td>${money(b.buyPrice)}</td><td>${money(b.sellPrice)}</td><td><button class="red" onclick="deleteBatch('${b.id}')">Ø³ÚÛÙÛÙÛ</button></td></tr>`; }).join("")}</tbody></table></div>`;
+}
+
+function purchasesHtml() {
+  return `<div class="card"><h2>Ú©ÚÛÙ</h2><p class="muted">Ø¨Û Ú©ÚÛÙØ ÙÛ Ø¨ÛØ´Û Ú©ÛÚ¯Ø§ Ù Batch Ø³ØªÛÚ© Ø²ÛØ§Ø¯ Ø¨Ú©Û.</p></div>`;
+}
+
+function suppliersHtml() {
+  return `
+    <div class="card">
+      <h2>Ø²ÛØ§Ø¯Ú©Ø±Ø¯ÙÛ Ø¯Ø§Ø¨ÛÙÚ©ÛØ±</h2>
+      <div class="grid two">
+        <div><label>ÙØ§Ù</label><input id="sName"></div>
+        <div><label>ÙÛØ¨Ø§ÛÙ</label><input id="sPhone"></div>
+        <div><label>ÙØ§ÙÙÛØ´Ø§Ù</label><input id="sAddress"></div>
+        <div><label>ØªÛØ¨ÛÙÛ</label><input id="sNote"></div>
+      </div>
+      <button onclick="addSupplier()" style="margin-top:12px">Ø²ÛØ§Ø¯Ú©Ø±Ø¯Ù</button>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ø¯Ø§Ø¨ÛÙÚ©ÛØ±Ø§Ù</h2><div id="supplierTable"></div></div>
+  `;
+}
+
+function addSupplier() {
+  const name = byId("sName").value.trim();
+  if (!name) return alert("ÙØ§Ù Ø¨ÙÙÙØ³Û");
+
+  db.suppliers.push({ id: uid("S"), name, phone: byId("sPhone").value.trim(), address: byId("sAddress").value.trim(), note: byId("sNote").value.trim() });
+  save();
+  render();
+}
+
+function deleteSupplier(id) {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ")) return;
+  db.suppliers = db.suppliers.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function renderSupplierTable() {
+  const box = byId("supplierTable");
+  if (!box) return;
+
+  box.innerHTML = `<div class="tablewrap"><table><thead><tr><th>ÙØ§Ù</th><th>ÙÛØ¨Ø§ÛÙ</th><th>ÙØ§ÙÙÛØ´Ø§Ù</th><th></th></tr></thead><tbody>${db.suppliers.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.phone)}</td><td>${esc(s.address)}</td><td><button class="red" onclick="deleteSupplier('${s.id}')">Ø³ÚÛÙÛÙÛ</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function customersHtml() {
+  return `
+    <div class="card">
+      <h2>Ø²ÛØ§Ø¯Ú©Ø±Ø¯ÙÛ Ú©ÚÛØ§Ø±</h2>
+      <div class="grid two">
+        <div><label>ÙØ§Ù</label><input id="cName"></div>
+        <div><label>ÙÛØ¨Ø§ÛÙ</label><input id="cPhone"></div>
+        <div><label>ÙØ§ÙÙÛØ´Ø§Ù</label><input id="cAddress"></div>
+      </div>
+      <button onclick="addCustomer()" style="margin-top:12px">Ø²ÛØ§Ø¯Ú©Ø±Ø¯Ù</button>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ú©ÚÛØ§Ø±Ø§Ù</h2><div id="customerTable"></div></div>
+  `;
+}
+
+function addCustomer() {
+  const name = byId("cName").value.trim();
+  if (!name) return alert("ÙØ§Ù Ø¨ÙÙÙØ³Û");
+
+  db.customers.push({ id: uid("C"), name, phone: byId("cPhone").value.trim(), address: byId("cAddress").value.trim() });
+  save();
+  render();
+}
+
+function deleteCustomer(id) {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ")) return;
+  db.customers = db.customers.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function renderCustomerTable() {
+  const box = byId("customerTable");
+  if (!box) return;
+
+  box.innerHTML = `<div class="tablewrap"><table><thead><tr><th>ÙØ§Ù</th><th>ÙÛØ¨Ø§ÛÙ</th><th>ÙØ§ÙÙÛØ´Ø§Ù</th><th></th></tr></thead><tbody>${db.customers.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.address)}</td><td><button class="red" onclick="deleteCustomer('${c.id}')">Ø³ÚÛÙÛÙÛ</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function prescriptionsHtml() {
+  return `
+    <div class="card">
+      <h2>ÚÛÚÛØªÛÚ©Ø§Ù</h2>
+      <p class="muted">Ø¦ÛÙ Ø¯ÛØ±ÙØ§ÙØ§ÙÛÛ ÚÛÚÛØªÛÛØ§Ù Ù¾ÛÙÛØ³ØªÛ ÙÛ Ø¯ÛØ±ÙØ§ÙÛÚ©Ø§Ù Ø¯ÛØ§Ø±Û Ø¨Ú©Û.</p>
+      <div class="tablewrap"><table><thead><tr><th>Ú©ÛØ¯</th><th>Ø¯ÛØ±ÙØ§Ù</th><th>ÙØ§ÙÛ Ø²Ø§ÙØ³ØªÛ</th></tr></thead><tbody>${db.medicines.filter(m => m.requiresPrescription).map(m => `<tr><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${esc(m.scientificName)}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">ÙÛÚ Ø¯ÛØ±ÙØ§ÙÛÚ© ÙÛÛÛ</td></tr>'}</tbody></table></div>
+    </div>
+  `;
+}
+
+function expensesHtml() {
+  return `
+    <div class="card">
+      <h2>ÙÛØ³Ø±ÙÙØ§Øª</h2>
+      <div class="grid two"><div><label>ÙØ§ÙÙÛØ´Ø§Ù</label><input id="eTitle"></div><div><label>Ø¨ÚÛ Ù¾Ø§Ø±Û</label><input id="eAmount" type="number"></div></div>
+      <button onclick="addExpense()" style="margin-top:12px">Ø²ÛØ§Ø¯Ú©Ø±Ø¯Ù</button>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>ÙÛØ³ØªÛ ÙÛØ³Ø±ÙÙØ§Øª</h2><div id="expenseTable"></div></div>
+  `;
+}
+
+function addExpense() {
+  const title = byId("eTitle").value.trim();
+  const amount = Number(byId("eAmount").value || 0);
+  if (!title || !amount) return alert("Ø²Ø§ÙÛØ§Ø±Û Ù¾Ú Ø¨Ú©ÛÙÛ");
+
+  db.expenses.push({ id: uid("E"), date: new Date().toISOString(), title, amount });
+  save();
+  render();
+}
+
+function deleteExpense(id) {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ")) return;
+  db.expenses = db.expenses.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function renderExpenseTable() {
+  const box = byId("expenseTable");
+  if (!box) return;
+
+  box.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Ø¨ÛØ±ÙØ§Ø±</th><th>ÙØ§ÙÙÛØ´Ø§Ù</th><th>Ø¨Ú</th><th></th></tr></thead><tbody>${db.expenses.map(e => `<tr><td>${dateStr(e.date)}</td><td>${esc(e.title)}</td><td>${money(e.amount)}</td><td><button class="red" onclick="deleteExpense('${e.id}')">Ø³ÚÛÙÛÙÛ</button></td></tr>`).join("") || '<tr><td colspan="4" class="muted">ÙÛÚ ÙÛØ³Ø±ÙÙÛÚ© ÙÛÛÛ</td></tr>'}</tbody></table></div>`;
+}
+
+function reportsHtml() {
+  const totalSales = db.sales.reduce((s, x) => s + Number(x.total || 0), 0);
+  const totalProfit = db.sales.reduce((s, x) => s + Number(x.profit || 0), 0);
+  const totalExpenses = db.expenses.reduce((s, x) => s + Number(x.amount || 0), 0);
+  const net = totalProfit - totalExpenses;
+
+  return `
+    <div class="grid four">
+      <div class="card"><div class="muted">ÙÛÙÙÙ ÙØ±ÛØ´ØªÙ</div><div class="kpi">${money(totalSales)}</div></div>
+      <div class="card"><div class="muted">ÙÛÙÙÙ ÙØ§Ø²Ø§ÙØ¬</div><div class="kpi">${money(totalProfit)}</div></div>
+      <div class="card"><div class="muted">ÙÛØ³Ø±ÙÙØ§Øª</div><div class="kpi">${money(totalExpenses)}</div></div>
+      <div class="card"><div class="muted">ÙØ§Ø²Ø§ÙØ¬Û Ù¾Ø§Ú©</div><div class="kpi">${money(net)}</div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>ÙÛÙÙÙ ÙØ±ÛØ´ØªÙÛÚ©Ø§Ù</h2>${salesTable(1000)}</div>
+  `;
+}
+
+function settingsHtml() {
+  return `
+    <div class="card">
+      <h2>ÚÛÚ©Ø®Ø³ØªÙ</h2>
+      <label>ÙØ§ÙÛ Ø¯ÛØ±ÙØ§ÙØ®Ø§ÙÛ</label><input id="setName" value="${esc(db.settings.pharmacyName)}">
+      <label>ÙÛØ¨Ø§ÛÙ</label><input id="setPhone" value="${esc(db.settings.phone)}">
+      <label>ÙØ§ÙÙÛØ´Ø§Ù</label><input id="setAddress" value="${esc(db.settings.address)}">
+      <label>ØªÛØ¨ÛÙÛ ÙÛØ³Ù</label><input id="setNote" value="${esc(db.settings.receiptNote)}">
+      <button onclick="saveSettings()" style="margin-top:12px">Ù¾Ø§Ø´ÛÚ©ÛÙØªÚ©Ø±Ø¯Ù</button>
+      <button class="red" onclick="resetData()" style="margin-top:12px">ÚÛØ³ÛØªÚ©Ø±Ø¯ÙÛ Ø¯Ø§ØªØ§</button>
+    </div>
+  `;
+}
+
+function saveSettings() {
+  db.settings.pharmacyName = byId("setName").value.trim();
+  db.settings.phone = byId("setPhone").value.trim();
+  db.settings.address = byId("setAddress").value.trim();
+  db.settings.receiptNote = byId("setNote").value.trim();
+  save();
+  render();
+}
+
+function resetData() {
+  if (!confirm("Ø¯ÚµÙÛØ§ÛØªØ ÙÛÙÙÙ Ø¯Ø§ØªØ§ Ø¯ÛØ³ÚØ¯Ø±ÛØªÛÙÛ")) return;
+  db = clone(DEFAULT);
+  state.cart = [];
+  save();
+  render();
+}
+
+render();
